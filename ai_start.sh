@@ -50,7 +50,11 @@ function start_vllm {
 # Start FastCRW service
 function start_crw {
   echo "Starting FastCRW..."
-  docker compose -f "$PROJECT_ROOT/fastcrw/docker-compose.yml" up -d
+  local compose_files=("-f" "$PROJECT_ROOT/fastcrw/docker-compose.yml")
+  if ! $START_VLLM; then
+    compose_files+=("-f" "$PROJECT_ROOT/fastcrw/docker-compose.novllm.yml")
+  fi
+  docker compose "${compose_files[@]}" up -d
   echo "  ✓ FastCRW is ready!"
 }
 
