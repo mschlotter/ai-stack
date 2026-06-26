@@ -1,0 +1,4 @@
+# Environment files (may contain secrets)
+/.env
+fastcrw/.env
+vllm/.env
