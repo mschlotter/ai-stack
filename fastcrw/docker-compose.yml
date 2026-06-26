@@ -15,19 +15,19 @@ services:
     environment:
       - RUST_LOG=info
       - CRW_CONFIG=config.docker
-      - CRW_RENDERER__CHROME_CONTEXT_POOL_ENABLED=${CRW_RENDERER__CHROME_CONTEXT_POOL_ENABLED:-true}
-      - CRW_RENDERER__CHROME_BACKEND=${CRW_RENDERER__CHROME_BACKEND:-vanilla}
-      - CRW_RENDERER__CHROME_POOL__SIZE=${CRW_RENDERER__CHROME_POOL__SIZE:-4}
-      - CRW_EXTRACTION__LLM__PROVIDER=openai-compatible
-      - CRW_EXTRACTION__LLM__BASE_URL=http://vllm:8000/v1
-      - CRW_EXTRACTION__LLM__MODEL=nvidia/Qwen3.6-35B-A3B-NVFP4
-      - CRW_EXTRACTION__LLM__API_KEY=vllm
+      - CRW_RENDERER__CHROME_CONTEXT_POOL_ENABLED="true"
+      - CRW_RENDERER__CHROME_BACKEND=vanilla
+      - CRW_RENDERER__CHROME_POOL__SIZE=4
+      - CRW_EXTRACTION__LLM__PROVIDER=${LLM_PROVIDER:-openai-compatible}
+      - CRW_EXTRACTION__LLM__BASE_URL=${LLM_BASE_URL:-http://vllm:8000/v1}
+      - CRW_EXTRACTION__LLM__MODEL=${LLM_MODEL:-nvidia/Qwen3.6-35B-A3B-NVFP4}
+      - CRW_EXTRACTION__LLM__API_KEY=${LLM_API_KEY:-vllm}
     volumes:
       - ./config.docker.toml:/app/config.docker.toml:ro
     tmpfs:
       - /tmp
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: 5m
         max-file: "2"
@@ -71,7 +71,7 @@ services:
       - /tmp:size=64m
       - /var/cache/searxng:size=128m
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: 5m
         max-file: "2"
@@ -89,7 +89,7 @@ services:
     mem_limit: 1g
     memswap_limit: 1g
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: 5m
         max-file: "2"
@@ -114,7 +114,7 @@ services:
       - "--disable-http2"
       - "--disable-blink-features=AutomationControlled"
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
         max-size: 5m
         max-file: "2"
@@ -136,11 +136,11 @@ services:
     mem_limit: 3g
     memswap_limit: 3g
     environment:
-      - TOKEN=${BROWSERLESS_TOKEN:-crwtest}
+      - TOKEN=${BROWSERLESS_TOKEN:-change-me-with-openssl-rand-hex-24-please}
       - CONCURRENT=15
       - MAX_QUEUE_LENGTH=30
       - TIMEOUT=30000
-      - EXIT_ON_HEALTH_FAILURE=true
+      - EXIT_ON_HEALTH_FAILURE="true"
     tmpfs:
       - /tmp:size=512m
     logging:

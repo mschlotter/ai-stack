@@ -32,9 +32,9 @@ services:
       --enable-prefix-caching
       nvidia/Qwen3.6-35B-A3B-NVFP4
     logging:
-      driver: "json-file"
+      driver: json-file
       options:
-        max-size: "5m"
+        max-size: 5m
         max-file: "2"
     networks:
       - ai-network

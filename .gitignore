@@ -1,4 +1,25 @@
 # Environment files (may contain secrets)
-/.env
-fastcrw/.env
-vllm/.env
+.env
+.env.*.local
+*.env.local
+
+# Local overrides
+!*.example
+!*.sample
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+*.tmp
