@@ -1,0 +1,163 @@
+services:
+  crw:
+    image: ghcr.io/us/crw:latest
+    container_name: crw
+    ports:
+      - "3000:3000"
+    read_only: true
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 512
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - RUST_LOG=info
+      - CRW_CONFIG=config.docker
+      - CRW_RENDERER__CHROME_CONTEXT_POOL_ENABLED=${CRW_RENDERER__CHROME_CONTEXT_POOL_ENABLED:-true}
+      - CRW_RENDERER__CHROME_BACKEND=${CRW_RENDERER__CHROME_BACKEND:-vanilla}
+      - CRW_RENDERER__CHROME_POOL__SIZE=${CRW_RENDERER__CHROME_POOL__SIZE:-4}
+      - CRW_EXTRACTION__LLM__PROVIDER=openai-compatible
+      - CRW_EXTRACTION__LLM__BASE_URL=http://vllm:8000/v1
+      - CRW_EXTRACTION__LLM__MODEL=nvidia/Qwen3.6-35B-A3B-NVFP4
+      - CRW_EXTRACTION__LLM__API_KEY=vllm
+    volumes:
+      - ./config.docker.toml:/app/config.docker.toml:ro
+    tmpfs:
+      - /tmp
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 5m
+        max-file: "2"
+    depends_on:
+      # SearXNG sidecar, backs `/v1/search`
+      searxng:
+        condition: service_healthy
+      # LightPanda as lightweight primary JS renderer
+      lightpanda:
+        condition: service_started
+      # Chrome as fallback JS renderer is opt-in via '--profile heavy'
+      chrome:
+        condition: service_started
+        required: false
+      # Chrome-Stealth is opt-in via '--profile stealth'
+      chrome-stealth:
+        condition: service_started
+        required: false
+    networks:
+      - default     # talks to sidecars (searxng, lightpanda, etc.)
+      - ai-network  # talks to vLLM externally
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    read_only: true
+    pids_limit: 256
+    mem_limit: 512m
+    memswap_limit: 512m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - SEARXNG_SECRET_KEY=${SEARXNG_SECRET_KEY:-change-me-with-openssl-rand-hex-32-please}
+    volumes:
+      - ./config/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    tmpfs:
+      - /tmp:size=64m
+      - /var/cache/searxng:size=128m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 5m
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  lightpanda:
+    image: lightpanda/browser:latest
+    container_name: lightpanda
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 5m
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9222"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  chrome:
+    image: chromedp/headless-shell:latest
+    container_name: chrome
+    restart: unless-stopped
+    profiles: ["heavy"]
+    shm_size: 2g
+    mem_limit: 2g
+    memswap_limit: 2g
+    command:
+      - "--remote-allow-origins=*"
+      - "--ignore-certificate-errors"
+      - "--disable-http2"
+      - "--disable-blink-features=AutomationControlled"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 5m
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9222"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  chrome-stealth:
+    image: ghcr.io/browserless/chromium:v2.27.0
+    container_name: chrome-stealth
+    restart: unless-stopped
+    profiles: ["stealth"]
+    ports:
+      - "127.0.0.1:9224:3000"
+    shm_size: 2g
+    mem_limit: 3g
+    memswap_limit: 3g
+    environment:
+      - TOKEN=${BROWSERLESS_TOKEN:-crwtest}
+      - CONCURRENT=15
+      - MAX_QUEUE_LENGTH=30
+      - TIMEOUT=30000
+      - EXIT_ON_HEALTH_FAILURE=true
+    tmpfs:
+      - /tmp:size=512m
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+networks:
+  default:
+  ai-network:
+    name: ai-network
+    external: true
+ 
