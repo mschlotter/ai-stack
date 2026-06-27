@@ -42,4 +42,4 @@ services:
 networks:
   ai-network:
     name: ai-network
-    driver: bridge
+    external: true

@@ -15,32 +15,47 @@ Usage: $(basename "$0") [OPTIONS]
 Start AI Agent stack: vLLM + FastCRW incl. SearXNG
 
 Options:
-  -nv, --novllm  Skip starting vLLM service
-  -nc, --nocrw   Skip starting FastCRW service
-  -h, --help     Show this help message and exit
+  -nv, --novllm    Skip starting vLLM service
+  -nc, --nocrw     Skip starting FastCRW service
+  -ph, --heavy     Activate FastCRW heavy profile (Chrome for browsing)
+  -ps, --stealth   Activate FastCRW heavy profile (Broserless Chrome)
+  -h, --help       Show this help message and exit
 
 Endpoints:
-  vLLM           → http://localhost:11436/v1
-  FastCRW        → http://localhost:11235
+  vLLM             → http://localhost:11436/v1
+  FastCRW          → http://localhost:11235
 EOF
   exit 0
 }
 
 echo "=== Starting AI Agent Stack ==="
 
+# Start AI network
+function start_network {
+  echo "Creating ai-network..."
+  if docker network inspect ai-network >/dev/null 2>&1; then
+    echo "⚠️ ai-network already exists!"
+  else
+    docker network create -d bridge ai-network
+    echo "✅ ai-network created!"
+  fi
+  echo ""
+}
+
 # Start vLLM service
 function start_vllm {
-  echo "Starting vLLM..."
+  echo "Starting vLLM (this may take a few minutes)..."
   docker compose -f "$PROJECT_ROOT/vllm/docker-compose.yml" up -d
 
-  echo "Waiting for vLLM to finish loading the model..."
   for i in $(seq 1 120); do
     if curl -s http://localhost:11436/v1/models >/dev/null 2>&1; then
-      echo "  ✓ vLLM is ready!"
+      echo "✅ vLLM is ready!"
+      echo ""
       return 0
     fi
     if [ "$i" -eq 120 ]; then
-      echo "  ✗ vLLM timed out — check logs: docker compose logs vllm"
+      echo "❌ vLLM timed out — check logs: docker compose logs vllm"
+      echo ""
       return 1
     fi
     sleep 3
@@ -50,17 +65,25 @@ function start_vllm {
 # Start FastCRW service
 function start_crw {
   echo "Starting FastCRW..."
-  local compose_files=("-f" "$PROJECT_ROOT/fastcrw/docker-compose.yml")
+  local compose_cmd=("-f" "$PROJECT_ROOT/fastcrw/docker-compose.yml")
   if ! $START_VLLM; then
-    compose_files+=("-f" "$PROJECT_ROOT/fastcrw/docker-compose.novllm.yml")
+    compose_cmd+=("-f" "$PROJECT_ROOT/fastcrw/docker-compose.novllm.yml")
   fi
-  docker compose "${compose_files[@]}" up -d
-  echo "  ✓ FastCRW is ready!"
+  if $PROFILE_HEAVY; then
+    compose_cmd+=("--profile" "heavy")
+  fi
+  if $PROFILE_STEALTH; then
+    compose_cmd+=("--profile" "stealth")
+  fi
+  docker compose "${compose_cmd[@]}" up -d
+  echo "✅ FastCRW is ready!"
 }
 
 # Initialize arguments
 START_VLLM=true
 START_CRW=true
+PROFILE_HEAVY=false
+PROFILE_STEALTH=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -76,6 +99,14 @@ while [[ $# -gt 0 ]]; do
       START_CRW=false
       shift
       ;;
+    -ph|--heavy)
+      PROFILE_HEAVY=true
+      shift
+      ;;
+    -ps|--stealth)
+      PROFILE_STEALTH=true
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
       echo "Try '$(basename "$0") --help' for more information."
@@ -85,6 +116,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Execute start functions based on flags
+start_network
+
 if $START_VLLM; then
   start_vllm || exit 1
 else
@@ -99,13 +132,12 @@ fi
 
 echo ""
 echo "=== Stack is running ==="
-echo ""
 
 # Print endpoints for started services
 if $START_VLLM; then
-  echo "  vLLM         → http://localhost:11436/v1"
+  echo "vLLM     ➔ http://localhost:11436/v1"
 fi
 if $START_CRW; then
-  echo "  FastCRW      → http://localhost:11235"
+  echo "FastCRW  ➔ http://localhost:11235"
 fi
 echo ""

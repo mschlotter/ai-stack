@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Stop AI Agent stack: vLLM + FastCRW incl. SearXNG
+# Usage: ai_stop.sh
 
 # Enable Bash strict mode
 set -euo pipefail
@@ -29,8 +30,14 @@ if is_vllm_running; then
   docker compose -f "$PROJECT_ROOT/vllm/docker-compose.yml" down
 fi
 
+# Remove ai-network if it exists
+if docker network inspect ai-network >/dev/null 2>&1; then
+  echo "Removing ai-network..."
+  docker network rm ai-network
+fi
+
 echo ""
 echo "=== AI Stack has stopped cleanly ==="
-echo "  → GPU VRAM released."
-echo "  → Model cache preserved at ~/.cache/huggingface"
+echo "GPU VRAM released."
+echo "Model cache preserved at ~/.cache/huggingface"
 echo ""
